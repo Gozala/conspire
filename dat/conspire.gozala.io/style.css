@@ -1,0 +1,15 @@
+body {
+  display: flex;
+  position: absolute;
+  height: 90%;
+  width: 100%;
+}
+
+article {
+  border: 1px solid lightgray;
+  height: auto;
+}
+#bob,
+#alice {
+  margin: 30px;
+}
