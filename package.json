@@ -1,0 +1,5 @@
+{
+  "scripts": {
+    "test": "deno run ./test/test.js -L debug"
+  }
+}

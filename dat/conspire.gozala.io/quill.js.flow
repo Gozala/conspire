@@ -1,0 +1,23 @@
+// @flow strict
+export type Delta = {
+  ops: Op[]
+}
+
+export type Op = Insert | Embed | Delete | Retain
+export type Attributes = { [string]: string | number | boolean | null }
+
+export type Insert = {|
+  insert: string,
+  attributes?: Attributes
+|}
+
+export type Embed = {|
+  insert: Attributes,
+  attributes?: Attributes
+|}
+
+export type Delete = {| delete: number |}
+export type Retain = {|
+  retain: number,
+  attributes?: Attributes
+|}

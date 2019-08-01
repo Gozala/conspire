@@ -1,0 +1,316 @@
+// @flow strict
+
+export interface Change<a> {
+  message?: string;
+  requestType?: RequestType;
+  actor: string;
+  seq: number;
+  deps: Clock;
+  ops: Op[];
+  diffs?: Diff[];
+}
+
+export interface Op {
+  action: OpAction;
+  obj: UUID;
+  key?: string;
+  value?: any;
+  datatype?: DataType;
+  elem?: number;
+}
+
+export interface Patch {
+  actor?: string;
+  seq?: number;
+  clock?: Clock;
+  deps?: Clock;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  diffs: Diff[];
+}
+
+export interface Diff {
+  action: DiffAction;
+  type: CollectionType;
+  obj: UUID;
+  path?: string[];
+  key?: string;
+  index?: number;
+  value?: any;
+  elemId?: string;
+  conflicts?: Conflict[];
+  datatype?: DataType;
+  link?: boolean;
+}
+
+export interface Conflict {
+  actor: string;
+  value: any;
+  link?: boolean;
+}
+
+export type RequestType =
+  | "change" //..
+  | "redo"
+  | "undo"
+
+export type OpAction =
+  | "ins"
+  | "del"
+  | "inc"
+  | "link"
+  | "set"
+  | "makeText"
+  | "makeTable"
+  | "makeList"
+  | "makeMap"
+
+export type DiffAction =
+  | "create" //..
+  | "insert"
+  | "set"
+  | "remove"
+
+export type CollectionType =
+  | "list" //..
+  | "map"
+  | "table"
+  | "text"
+
+export type DataType =
+  | "counter" //..
+  | "timestamp"
+
+export interface Clock {
+  [actorId: string]: number;
+}
+
+export interface Message<a> {
+  docId: string;
+  clock: Clock;
+  changes?: Change<a>[];
+}
+
+export interface State<a> {
+  change: Change<a>;
+  snapshot: a;
+}
+
+declare export class Counter {
+  +value: number;
+  valueOf(): number;
+}
+
+declare export class MutableCounter {
+  +value: number;
+  increment(n?: number): void;
+  decrement(n?: number): void;
+}
+
+export opaque type UUID: string = string
+
+type KeyArray<a, keyOrder = a[]> = keyOrder
+
+declare export class Table<a> extends Array<a> {
+  constructor(columns: KeyArray<a>): void;
+  add(item: a): UUID;
+  byId(id: UUID): a;
+  +columns: string[];
+  +count: number;
+  +ids: UUID[];
+  remove(id: UUID): void;
+  rows(): a[];
+  set(id: UUID, value: a): void;
+  set(id: "columns", value: string[]): void;
+}
+
+declare export class MutableTable<a> extends Table<a> {}
+
+export type List<a> = $ReadOnlyArray<a>
+
+declare export class Sequence<+a> {
+  +length: number;
+  @@iterator(): Iterator<a>;
+  get(number): a;
+
+  concat<b, item: $ReadOnlyArray<b> | b>(...items: Array<item>): Array<a | b>;
+  every(
+    callbackfn: (value: a, index: number, array: $ReadOnlyArray<a>) => mixed,
+    thisArg?: any
+  ): boolean;
+  filter(callbackfn: typeof Boolean): Array<$NonMaybeType<a>>;
+  filter(
+    callbackfn: (value: a, index: number, array: $ReadOnlyArray<a>) => mixed,
+    thisArg?: any
+  ): Array<a>;
+  find(
+    callbackfn: (value: a, index: number, array: $ReadOnlyArray<a>) => mixed,
+    thisArg?: any
+  ): a | void;
+  findIndex(
+    callbackfn: (value: a, index: number, array: $ReadOnlyArray<a>) => mixed,
+    thisArg?: any
+  ): number;
+  forEach(
+    callbackfn: (value: a, index: number, array: $ReadOnlyArray<a>) => mixed,
+    thisArg?: any
+  ): void;
+  includes(searchElement: mixed, fromIndex?: number): boolean;
+  indexOf(searchElement: mixed, fromIndex?: number): number;
+  join(separator?: string): string;
+  lastIndexOf(searchElement: mixed, fromIndex?: number): number;
+  map<U>(
+    callbackfn: (value: a, index: number, array: $ReadOnlyArray<a>) => U,
+    thisArg?: any
+  ): Array<U>;
+  // flatMap<U>(callbackfn: (value: a, index: number, array: $ReadOnlyArray<a>) => $ReadOnlyArray<U> | U, thisArg?: any): Array<U>;
+  reduce(
+    callbackfn: (
+      previousValue: a,
+      currentValue: a,
+      currentIndex: number,
+      array: $ReadOnlyArray<a>
+    ) => a,
+    initialValue: void
+  ): a;
+  reduce<U>(
+    callbackfn: (
+      previousValue: U,
+      currentValue: a,
+      currentIndex: number,
+      array: $ReadOnlyArray<a>
+    ) => U,
+    initialValue: U
+  ): U;
+  reduceRight(
+    callbackfn: (
+      previousValue: a,
+      currentValue: a,
+      currentIndex: number,
+      array: $ReadOnlyArray<a>
+    ) => a,
+    initialValue: void
+  ): a;
+  reduceRight<U>(
+    callbackfn: (
+      previousValue: U,
+      currentValue: a,
+      currentIndex: number,
+      array: $ReadOnlyArray<a>
+    ) => U,
+    initialValue: U
+  ): U;
+  slice(start?: number, end?: number): Array<a>;
+  some(
+    callbackfn: (value: a, index: number, array: $ReadOnlyArray<a>) => mixed,
+    thisArg?: any
+  ): boolean;
+
+  toLocaleString(): string;
+  toString(): string;
+}
+
+declare export class MutableSequence<+a> extends Sequence<a> {
+  +length: number;
+
+  @@iterator(): Iterator<a>;
+
+  fill(a, start?: number, end?: number): List<a>;
+  pop(): a;
+  push(): number;
+  shift(): a;
+  splice(start: number, deleteCount?: number, ...values: a[]): List<a>;
+  unshift(...a[]): List<a>;
+  entries(): Iterator<[number, a]>;
+  keys(): Iterator<number>;
+  values(): Iterator<a>;
+}
+
+declare export class MutableList<+a> extends MutableSequence<a> {
+  insertAt(index: number, ...args: a[]): List<a>;
+  deleteAt(index: number, numDelete?: number): List<a>;
+}
+
+export type Member =
+  | null
+  | string
+  | number
+  | boolean
+  | Counter
+  | Text
+  | List<*>
+  | Table<*>
+  | Dictionary<*>
+
+export type Dictionary<a: { [string]: Member }> = a
+
+export type MutableDictionary<a> = $ObjMap<
+  Dictionary<a>,
+  {
+    (string): string,
+    (number): number,
+    (boolean): boolean,
+    (null): null,
+    (Counter): MutableCounter,
+    (Text): MutableText,
+    <b>(List<b>): MutableList<b>,
+    <b>(Table<b>): MutableTable<b>,
+    <b>(Dictionary<b>): MutableDictionary<b>
+  }
+>
+
+declare export class Text extends Sequence<string> {
+  getElemId(number): ?string;
+  join(seperator?: string): string;
+  toJSON(): string;
+}
+
+declare export class MutableText extends Text {
+  insertAt(index: number, ...args: string[]): void;
+  deleteAt(index: number, numDelete?: number): void;
+}
+
+export type Mutate<a> = (MutableDocument<a>) => void
+
+export type Document<a> = Dictionary<a>
+export type MutableDocument<a> = MutableDictionary<a>
+
+declare export function init<a>(actorID?: string): Document<a>
+declare export function from<a>(state: a | Document<a>): Document<a>
+declare export function merge<a>(
+  local: Document<a>,
+  remote: Document<a>
+): Document<a>
+
+declare export function change<a>(Document<a>, ?string, Mutate<a>): Document<a>
+declare export function change<a>(Document<a>, Mutate<a>): Document<a>
+declare export function emptyChange<a>(
+  doc: Document<a>,
+  message?: string
+): Document<a>
+declare export function applyChanges<a>(
+  Document<a>,
+  changes: Change<a>[]
+): Document<a>
+declare export function diff<a>(
+  olddoc: Document<a>,
+  newdoc: Document<a>
+): Diff[]
+declare export function equals(Member, Member): boolean
+declare export function getActorId<a>(Document<a>): string
+declare export function getChanges<a>(
+  before: Document<a>,
+  after: Document<a>
+): Change<a>[]
+declare export function getConflicts<a>(Document<a>, $Keys<a>): Conflict[]
+declare export function getHistory<a>(Document<a>): State<a>[]
+declare export function getMissingDeps<a>(Document<a>): Clock
+declare export function getObjectById<a>(Document<a>, UUID): Member
+declare export function getObjectId(Member): UUID
+declare export function load<a>(string): Document<a>
+declare export function save<a>(Document<a>): string
+declare function canRedo<a>(doc: Document<a>): boolean
+declare function canUndo<a>(doc: Document<a>): boolean
+
+declare function redo<a>(doc: Document<a>, message?: string): Document<a>
+declare function undo<a>(doc: Document<a>, message?: string): Document<a>

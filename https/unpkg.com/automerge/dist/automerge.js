@@ -1201,7 +1201,7 @@ function pushUndoHistory(opSet) {
 }
 
 function init() {
-  return Map().set('states', Map()).set('history', List()).set('byObject', Map().set(ROOT_ID, Map().set('_keys', Map()))).set('clock', Map()).set('deps', Map()).set('local', List()).set('undoPos', 0).set('undoStack', List()).set('redoStack', List()).set('queue', List());
+  return Map().set('states', Map()).set('history', List()).set('byObject', Map().set(ROOT_ID, Map().set('_keys', Map()))).set('clock', Map()).set('deps', Map()).set('undoPos', 0).set('undoStack', List()).set('redoStack', List()).set('queue', List());
 }
 
 function addChange(opSet, change, isUndoable) {
@@ -1528,11 +1528,10 @@ var Node = function () {
     this.key = key;
     this.value = value;
     this.level = level;
-    this.prevKey = Object.freeze(prevKey);
-    this.nextKey = Object.freeze(nextKey);
-    this.prevCount = Object.freeze(prevCount);
-    this.nextCount = Object.freeze(nextCount);
-    Object.freeze(this);
+    this.prevKey = prevKey;
+    this.nextKey = nextKey;
+    this.prevCount = prevCount;
+    this.nextCount = nextCount;
   }
 
   _createClass(Node, [{
@@ -1901,7 +1900,7 @@ function makeInstance(length, nodes, randomSource) {
   instance.length = length;
   instance._nodes = nodes;
   instance._randomSource = randomSource;
-  return Object.freeze(instance);
+  return instance;
 }
 
 module.exports = { SkipList: SkipList };
@@ -1923,16 +1922,19 @@ function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr
 var _require = __webpack_require__(/*! ../src/common */ "./src/common.js"),
     ROOT_ID = _require.ROOT_ID,
     isObject = _require.isObject,
+    copyObject = _require.copyObject,
     parseElemId = _require.parseElemId;
 
 var _require2 = __webpack_require__(/*! ./constants */ "./frontend/constants.js"),
+    OPTIONS = _require2.OPTIONS,
     OBJECT_ID = _require2.OBJECT_ID,
     CONFLICTS = _require2.CONFLICTS,
     ELEM_IDS = _require2.ELEM_IDS,
     MAX_ELEM = _require2.MAX_ELEM;
 
 var _require3 = __webpack_require__(/*! ./text */ "./frontend/text.js"),
-    Text = _require3.Text;
+    Text = _require3.Text,
+    instantiateText = _require3.instantiateText;
 
 var _require4 = __webpack_require__(/*! ./table */ "./frontend/table.js"),
     Table = _require4.Table,
@@ -2072,8 +2074,8 @@ function cloneMapObject(originalObject, objectId) {
   if (originalObject && originalObject[OBJECT_ID] !== objectId) {
     throw new RangeError('cloneMapObject ID mismatch: ' + originalObject[OBJECT_ID] + ' !== ' + objectId);
   }
-  var object = Object.assign({}, originalObject);
-  var conflicts = Object.assign({}, originalObject ? originalObject[CONFLICTS] : undefined);
+  var object = copyObject(originalObject);
+  var conflicts = copyObject(originalObject ? originalObject[CONFLICTS] : undefined);
   Object.defineProperty(object, CONFLICTS, { value: conflicts });
   Object.defineProperty(object, OBJECT_ID, { value: objectId });
   return object;
@@ -2179,7 +2181,7 @@ function parentMapObject(objectId, cache, updated) {
           value = conflicts[actorId];
           if (isObject(value) && updated[value[OBJECT_ID]]) {
             if (!conflictsUpdate) {
-              conflictsUpdate = Object.assign({}, conflicts);
+              conflictsUpdate = copyObject(conflicts);
               object[CONFLICTS][key] = conflictsUpdate;
             }
             conflictsUpdate[actorId] = updated[value[OBJECT_ID]];
@@ -2200,7 +2202,7 @@ function parentMapObject(objectId, cache, updated) {
         }
       }
 
-      if (conflictsUpdate) {
+      if (conflictsUpdate && cache[ROOT_ID][OPTIONS].freeze) {
         Object.freeze(conflictsUpdate);
       }
     }
@@ -2423,7 +2425,7 @@ function parentListObject(objectId, cache, updated) {
         value = conflicts[actorId];
         if (isObject(value) && updated[value[OBJECT_ID]]) {
           if (!conflictsUpdate) {
-            conflictsUpdate = Object.assign({}, conflicts);
+            conflictsUpdate = copyObject(conflicts);
             list[CONFLICTS][index] = conflictsUpdate;
           }
           conflictsUpdate[actorId] = updated[value[OBJECT_ID]];
@@ -2444,7 +2446,7 @@ function parentListObject(objectId, cache, updated) {
       }
     }
 
-    if (conflictsUpdate) {
+    if (conflictsUpdate && cache[ROOT_ID][OPTIONS].freeze) {
       Object.freeze(conflictsUpdate);
     }
   }
@@ -2462,9 +2464,9 @@ function updateTextObject(diffs, startIndex, endIndex, cache, updated) {
     if (cache[objectId]) {
       var _elems = cache[objectId].elems.slice();
       var _maxElem = cache[objectId][MAX_ELEM];
-      updated[objectId] = new Text(objectId, _elems, _maxElem);
+      updated[objectId] = instantiateText(objectId, _elems, _maxElem);
     } else {
-      updated[objectId] = new Text(objectId);
+      updated[objectId] = instantiateText(objectId, [], 0);
     }
   }
 
@@ -2518,7 +2520,7 @@ function updateTextObject(diffs, startIndex, endIndex, cache, updated) {
 
     startIndex += 1;
   }
-  updated[objectId] = new Text(objectId, elems, maxElem);
+  updated[objectId] = instantiateText(objectId, elems, maxElem);
 }
 
 /**
@@ -2687,6 +2689,8 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
+function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
+
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 var _require = __webpack_require__(/*! ./constants */ "./frontend/constants.js"),
@@ -2711,7 +2715,8 @@ var _require5 = __webpack_require__(/*! ./counter */ "./frontend/counter.js"),
     getWriteableCounter = _require5.getWriteableCounter;
 
 var _require6 = __webpack_require__(/*! ../src/common */ "./src/common.js"),
-    isObject = _require6.isObject;
+    isObject = _require6.isObject,
+    copyObject = _require6.copyObject;
 
 var uuid = __webpack_require__(/*! ../src/uuid */ "./src/uuid.js");
 
@@ -2728,7 +2733,7 @@ var Context = function () {
     this.actorId = actorId;
     this.cache = doc[CACHE];
     this.updated = {};
-    this.inbound = Object.assign({}, doc[INBOUND]);
+    this.inbound = copyObject(doc[INBOUND]);
     this.ops = [];
     this.diffs = [];
   }
@@ -2802,11 +2807,20 @@ var Context = function () {
 
       if (value instanceof Text) {
         // Create a new Text object
-        if (value.length > 0) {
-          throw new RangeError('Assigning a non-empty Text object is not supported');
-        }
         this.apply({ action: 'create', type: 'text', obj: objectId });
         this.addOp({ action: 'makeText', obj: objectId });
+
+        if (value.length > 0) {
+          this.splice(objectId, 0, 0, [].concat(_toConsumableArray(value)));
+        }
+
+        // Set object properties so that any subsequent modifications of the Text
+        // object can be applied to the context
+        var text = this.getObject(objectId);
+        value[OBJECT_ID] = objectId;
+        value.elems = text.elems;
+        value[MAX_ELEM] = text.maxElem;
+        value.context = this;
       } else if (value instanceof Table) {
         // Create a new Table object
         if (value.count > 0) {
@@ -3256,7 +3270,8 @@ var _require = __webpack_require__(/*! ./constants */ "./frontend/constants.js")
 
 var _require2 = __webpack_require__(/*! ../src/common */ "./src/common.js"),
     ROOT_ID = _require2.ROOT_ID,
-    isObject = _require2.isObject;
+    isObject = _require2.isObject,
+    copyObject = _require2.copyObject;
 
 var uuid = __webpack_require__(/*! ../src/uuid */ "./src/uuid.js");
 
@@ -3299,32 +3314,34 @@ function updateRootObject(doc, updated, inbound, state) {
   Object.defineProperty(newDoc, INBOUND, { value: inbound });
   Object.defineProperty(newDoc, STATE, { value: state });
 
-  var _iteratorNormalCompletion = true;
-  var _didIteratorError = false;
-  var _iteratorError = undefined;
+  if (doc[OPTIONS].freeze) {
+    var _iteratorNormalCompletion = true;
+    var _didIteratorError = false;
+    var _iteratorError = undefined;
 
-  try {
-    for (var _iterator = Object.keys(updated)[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-      var objectId = _step.value;
-
-      if (updated[objectId] instanceof Table) {
-        updated[objectId]._freeze();
-      } else {
-        Object.freeze(updated[objectId]);
-        Object.freeze(updated[objectId][CONFLICTS]);
-      }
-    }
-  } catch (err) {
-    _didIteratorError = true;
-    _iteratorError = err;
-  } finally {
     try {
-      if (!_iteratorNormalCompletion && _iterator.return) {
-        _iterator.return();
+      for (var _iterator = Object.keys(updated)[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+        var objectId = _step.value;
+
+        if (updated[objectId] instanceof Table) {
+          updated[objectId]._freeze();
+        } else {
+          Object.freeze(updated[objectId]);
+          Object.freeze(updated[objectId][CONFLICTS]);
+        }
       }
+    } catch (err) {
+      _didIteratorError = true;
+      _iteratorError = err;
     } finally {
-      if (_didIteratorError) {
-        throw _iteratorError;
+      try {
+        if (!_iteratorNormalCompletion && _iterator.return) {
+          _iterator.return();
+        }
+      } finally {
+        if (_didIteratorError) {
+          throw _iteratorError;
+        }
       }
     }
   }
@@ -3356,8 +3373,10 @@ function updateRootObject(doc, updated, inbound, state) {
     }
   }
 
-  Object.freeze(updated);
-  Object.freeze(inbound);
+  if (doc[OPTIONS].freeze) {
+    Object.freeze(updated);
+    Object.freeze(inbound);
+  }
   return newDoc;
 }
 
@@ -3405,9 +3424,9 @@ function makeChange(doc, requestType, context, message) {
   if (!actor) {
     throw new Error('Actor ID must be initialized with setActorId() before making a change');
   }
-  var state = Object.assign({}, doc[STATE]);
+  var state = copyObject(doc[STATE]);
   state.seq += 1;
-  var deps = Object.assign({}, state.deps);
+  var deps = copyObject(state.deps);
   delete deps[actor];
 
   var request = { requestType: requestType, actor: actor, seq: state.seq, deps: deps };
@@ -3428,9 +3447,10 @@ function makeChange(doc, requestType, context, message) {
     state.requests = [];
     return [applyPatchToDoc(doc, patch, state, true), request];
   } else {
-    var queuedRequest = Object.assign({}, request);
+    if (!context) context = new Context(doc, actor);
+    var queuedRequest = copyObject(request);
     queuedRequest.before = doc;
-    if (context) queuedRequest.diffs = context.diffs;
+    queuedRequest.diffs = context.diffs;
     state.requests = state.requests.slice(); // shallow clone
     state.requests.push(queuedRequest);
     return [updateRootObject(doc, context.updated, context.inbound, state), request];
@@ -3446,7 +3466,7 @@ function makeChange(doc, requestType, context, message) {
  */
 function applyPatchToDoc(doc, patch, state, fromBackend) {
   var actor = getActorId(doc);
-  var inbound = Object.assign({}, doc[INBOUND]);
+  var inbound = copyObject(doc[INBOUND]);
   var updated = {};
   applyDiffs(patch.diffs, doc[CACHE], updated, inbound);
   updateParentObjects(doc[CACHE], updated, inbound);
@@ -3509,7 +3529,7 @@ function transformRequest(request, patch) {
     local_loop: for (var _iterator3 = request.diffs[Symbol.iterator](), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
       var local = _step3.value;
 
-      local = Object.assign({}, local);
+      local = copyObject(local);
 
       var _iteratorNormalCompletion4 = true;
       var _didIteratorError4 = false;
@@ -3596,6 +3616,15 @@ function init(options) {
 }
 
 /**
+ * Returns a new document object initialized with the given state.
+ */
+function from(initialState, options) {
+  return change(init(options), 'Initialization', function (doc) {
+    return Object.assign(doc, initialState);
+  });
+}
+
+/**
  * Changes a document `doc` according to actions taken by the local user.
  * `message` is an optional descriptive string that is attached to the change.
  * The actual change is made within the callback function `callback`, which is
@@ -3663,7 +3692,7 @@ function emptyChange(doc, message) {
  * request should be included in the patch, so that we can match them up here.
  */
 function applyPatch(doc, patch) {
-  var state = Object.assign({}, doc[STATE]);
+  var state = copyObject(doc[STATE]);
   var baseDoc = void 0;
 
   if (state.requests.length > 0) {
@@ -3672,13 +3701,9 @@ function applyPatch(doc, patch) {
       if (state.requests[0].seq !== patch.seq) {
         throw new RangeError('Mismatched sequence number: patch ' + patch.seq + ' does not match next request ' + state.requests[0].seq);
       }
-      state.requests = state.requests.slice(1).map(function (req) {
-        return Object.assign({}, req);
-      });
+      state.requests = state.requests.slice(1).map(copyObject);
     } else {
-      state.requests = state.requests.slice().map(function (req) {
-        return Object.assign({}, req);
-      });
+      state.requests = state.requests.slice().map(copyObject);
     }
   } else {
     baseDoc = doc;
@@ -3851,7 +3876,7 @@ function getElementIds(list) {
 }
 
 module.exports = {
-  init: init, change: change, emptyChange: emptyChange, applyPatch: applyPatch,
+  init: init, from: from, change: change, emptyChange: emptyChange, applyPatch: applyPatch,
   canUndo: canUndo, undo: undo, canRedo: canRedo, redo: redo,
   getObjectId: getObjectId, getObjectById: getObjectById, getActorId: getActorId, setActorId: setActorId, getConflicts: getConflicts,
   getBackendState: getBackendState, getElementIds: getElementIds,
@@ -4140,9 +4165,9 @@ function listProxy(context, objectId) {
  */
 function instantiateProxy(objectId) {
   var object = this.getObject(objectId);
-  if (Array.isArray(object) || object instanceof Text) {
+  if (Array.isArray(object)) {
     return listProxy(this, objectId);
-  } else if (object instanceof Table) {
+  } else if (object instanceof Text || object instanceof Table) {
     return object.getWriteable(this);
   } else {
     return mapProxy(this, objectId);
@@ -4181,7 +4206,8 @@ var _require = __webpack_require__(/*! ./constants */ "./frontend/constants.js")
     CONFLICTS = _require.CONFLICTS;
 
 var _require2 = __webpack_require__(/*! ../src/common */ "./src/common.js"),
-    isObject = _require2.isObject;
+    isObject = _require2.isObject,
+    copyObject = _require2.copyObject;
 
 function compareRows(properties, row1, row2) {
   var _iteratorNormalCompletion = true;
@@ -4361,7 +4387,7 @@ var Table = function () {
       if (!this[OBJECT_ID]) {
         throw new RangeError('clone() requires the objectId to be set');
       }
-      return instantiateTable(this[OBJECT_ID], Object.assign({}, this.entries));
+      return instantiateTable(this[OBJECT_ID], copyObject(this.entries));
     }
 
     /**
@@ -4618,10 +4644,24 @@ var _require = __webpack_require__(/*! ./constants */ "./frontend/constants.js")
     MAX_ELEM = _require.MAX_ELEM;
 
 var Text = function () {
-  function Text(objectId, elems, maxElem) {
+  function Text(text) {
     _classCallCheck(this, Text);
 
-    return makeInstance(objectId, elems, maxElem);
+    if (typeof text === 'string') {
+      var elems = text.split('').map(function (value) {
+        return { value: value };
+      });
+      return instantiateText(undefined, elems, undefined);
+    } else if (Array.isArray(text)) {
+      var _elems = text.map(function (value) {
+        return { value: value };
+      });
+      return instantiateText(undefined, _elems, undefined);
+    } else if (text === undefined) {
+      return instantiateText(undefined, [], 0);
+    } else {
+      throw new TypeError('Unsupported initial value for Text: ' + text);
+    }
   }
 
   _createClass(Text, [{
@@ -4634,6 +4674,9 @@ var Text = function () {
     value: function getElemId(index) {
       return this.elems[index].elemId;
     }
+  }, {
+    key: 'getElemIndex',
+    value: function getElemIndex(id) {}
   }, {
     key: Symbol.iterator,
     value: function value() {
@@ -4652,6 +4695,15 @@ var Text = function () {
     }
 
     /**
+     * Returns the content of the Text object as a simple string.
+     */
+
+  }, {
+    key: 'toString',
+    value: function toString() {
+      return this.join('');
+    }
+    /**
      * Returns the content of the Text object as a simple string, so that the
      * JSON serialization of an Automerge document represents text nicely.
      */
@@ -4660,6 +4712,84 @@ var Text = function () {
     key: 'toJSON',
     value: function toJSON() {
       return this.join('');
+    }
+
+    /**
+     * Returns a writeable instance of this object. This instance is returned when
+     * the text object is accessed within a change callback. `context` is the
+     * proxy context that keeps track of the mutations.
+     */
+
+  }, {
+    key: 'getWriteable',
+    value: function getWriteable(context) {
+      if (!this[OBJECT_ID]) {
+        throw new RangeError('getWriteable() requires the objectId to be set');
+      }
+
+      var instance = instantiateText(this[OBJECT_ID], this.elems, this[MAX_ELEM]);
+      instance.context = context;
+      return instance;
+    }
+
+    /**
+     * Updates the list item at position `index` to a new value `value`.
+     */
+
+  }, {
+    key: 'set',
+    value: function set(index, value) {
+      if (this.context) {
+        this.context.setListIndex(this[OBJECT_ID], index, value);
+      } else if (!this[OBJECT_ID]) {
+        this.elems[index].value = value;
+      } else {
+        throw new TypeError('Automerge.Text object cannot be modified outside of a change block');
+      }
+      return this;
+    }
+
+    /**
+     * Inserts new list items `values` starting at position `index`.
+     */
+
+  }, {
+    key: 'insertAt',
+    value: function insertAt(index) {
+      for (var _len = arguments.length, values = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
+        values[_key - 1] = arguments[_key];
+      }
+
+      if (this.context) {
+        this.context.splice(this[OBJECT_ID], index, 0, values);
+      } else if (!this[OBJECT_ID]) {
+        var _elems2;
+
+        (_elems2 = this.elems).splice.apply(_elems2, [index, 0].concat(_toConsumableArray(values.map(function (value) {
+          return { value: value };
+        }))));
+      } else {
+        throw new TypeError('Automerge.Text object cannot be modified outside of a change block');
+      }
+      return this;
+    }
+
+    /**
+     * Deletes `numDelete` list items starting at position `index`.
+     * if `numDelete` is not given, one item is deleted.
+     */
+
+  }, {
+    key: 'deleteAt',
+    value: function deleteAt(index, numDelete) {
+      if (this.context) {
+        this.context.splice(this[OBJECT_ID], index, numDelete || 1, []);
+      } else if (!this[OBJECT_ID]) {
+        this.elems.splice(index, numDelete || 1);
+      } else {
+        throw new TypeError('Automerge.Text object cannot be modified outside of a change block');
+      }
+      return this;
     }
   }, {
     key: 'length',
@@ -4680,25 +4810,25 @@ var _loop = function _loop(method) {
 
     var array = [].concat(_toConsumableArray(this));
 
-    for (var _len = arguments.length, args = Array(_len), _key = 0; _key < _len; _key++) {
-      args[_key] = arguments[_key];
+    for (var _len2 = arguments.length, args = Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {
+      args[_key2] = arguments[_key2];
     }
 
     return (_array$method = array[method]).call.apply(_array$method, [array].concat(args));
   };
 };
 
-var _arr = ['concat', 'every', 'filter', 'find', 'findIndex', 'forEach', 'includes', 'indexOf', 'join', 'lastIndexOf', 'map', 'reduce', 'reduceRight', 'slice', 'some', 'toLocaleString', 'toString'];
+var _arr = ['concat', 'every', 'filter', 'find', 'findIndex', 'forEach', 'includes', 'indexOf', 'join', 'lastIndexOf', 'map', 'reduce', 'reduceRight', 'slice', 'some', 'toLocaleString'];
 for (var _i = 0; _i < _arr.length; _i++) {
   var method = _arr[_i];
   _loop(method);
 }
 
-function makeInstance(objectId, elems, maxElem) {
+function instantiateText(objectId, elems, maxElem) {
   var instance = Object.create(Text.prototype);
   instance[OBJECT_ID] = objectId;
-  instance.elems = elems || [];
-  instance[MAX_ELEM] = maxElem || 0;
+  instance.elems = elems;
+  instance[MAX_ELEM] = maxElem;
   return instance;
 }
 
@@ -4710,7 +4840,7 @@ function getElemId(object, index) {
   return object instanceof Text ? object.getElemId(index) : object[ELEM_IDS][index];
 }
 
-module.exports = { Text: Text, getElemId: getElemId };
+module.exports = { Text: Text, getElemId: getElemId, instantiateText: instantiateText };
 
 /***/ }),
 
@@ -6977,7 +7107,7 @@ module.exports = { Text: Text, getElemId: getElemId };
     // TODO: seems like these methods are very similar
 
     VNode.prototype.removeBefore = function(ownerID, level, index) {
-      if (index === level ? 1 << level : 0 || this.array.length === 0) {
+      if (index === level ? 1 << level :  false || this.array.length === 0) {
         return this;
       }
       var originIndex = (index >>> level) & MASK;
@@ -13910,14 +14040,15 @@ for (var i = 0; i < 256; ++i) {
 function bytesToUuid(buf, offset) {
   var i = offset || 0;
   var bth = byteToHex;
-  return bth[buf[i++]] + bth[buf[i++]] +
-          bth[buf[i++]] + bth[buf[i++]] + '-' +
-          bth[buf[i++]] + bth[buf[i++]] + '-' +
-          bth[buf[i++]] + bth[buf[i++]] + '-' +
-          bth[buf[i++]] + bth[buf[i++]] + '-' +
-          bth[buf[i++]] + bth[buf[i++]] +
-          bth[buf[i++]] + bth[buf[i++]] +
-          bth[buf[i++]] + bth[buf[i++]];
+  // join used to fix memory issue caused by concatenation: https://bugs.chromium.org/p/v8/issues/detail?id=3175#c4
+  return ([bth[buf[i++]], bth[buf[i++]], 
+	bth[buf[i++]], bth[buf[i++]], '-',
+	bth[buf[i++]], bth[buf[i++]], '-',
+	bth[buf[i++]], bth[buf[i++]], '-',
+	bth[buf[i++]], bth[buf[i++]], '-',
+	bth[buf[i++]], bth[buf[i++]],
+	bth[buf[i++]], bth[buf[i++]],
+	bth[buf[i++]], bth[buf[i++]]]).join('');
 }
 
 module.exports = bytesToUuid;
@@ -13930,31 +14061,34 @@ module.exports = bytesToUuid;
   !*** ./node_modules/uuid/lib/rng-browser.js ***!
   \**********************************************/
 /*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
+/***/ (function(module, exports) {
 
-/* WEBPACK VAR INJECTION */(function(global) {// Unique ID creation requires a high quality random # generator.  In the
+// Unique ID creation requires a high quality random # generator.  In the
 // browser this is a little complicated due to unknown quality of Math.random()
 // and inconsistent support for the `crypto` API.  We do the best we can via
 // feature-detection
-var rng;
 
-var crypto = global.crypto || global.msCrypto; // for IE 11
-if (crypto && crypto.getRandomValues) {
+// getRandomValues needs to be invoked in a context where "this" is a Crypto
+// implementation. Also, find the complete implementation of crypto on IE11.
+var getRandomValues = (typeof(crypto) != 'undefined' && crypto.getRandomValues && crypto.getRandomValues.bind(crypto)) ||
+                      (typeof(msCrypto) != 'undefined' && typeof window.msCrypto.getRandomValues == 'function' && msCrypto.getRandomValues.bind(msCrypto));
+
+if (getRandomValues) {
   // WHATWG crypto RNG - http://wiki.whatwg.org/wiki/Crypto
   var rnds8 = new Uint8Array(16); // eslint-disable-line no-undef
-  rng = function whatwgRNG() {
-    crypto.getRandomValues(rnds8);
+
+  module.exports = function whatwgRNG() {
+    getRandomValues(rnds8);
     return rnds8;
   };
-}
-
-if (!rng) {
+} else {
   // Math.random()-based (RNG)
   //
   // If all else fails, use Math.random().  It's fast, but is of unspecified
   // quality.
   var rnds = new Array(16);
-  rng = function() {
+
+  module.exports = function mathRNG() {
     for (var i = 0, r; i < 16; i++) {
       if ((i & 0x03) === 0) r = Math.random() * 0x100000000;
       rnds[i] = r >>> ((i & 0x03) << 3) & 0xff;
@@ -13964,9 +14098,6 @@ if (!rng) {
   };
 }
 
-module.exports = rng;
-
-/* WEBPACK VAR INJECTION */}.call(this, __webpack_require__(/*! ./../../webpack/buildin/global.js */ "./node_modules/webpack/buildin/global.js")))
 
 /***/ }),
 
@@ -13984,7 +14115,7 @@ function v4(options, buf, offset) {
   var i = buf && offset || 0;
 
   if (typeof(options) == 'string') {
-    buf = options == 'binary' ? new Array(16) : null;
+    buf = options === 'binary' ? new Array(16) : null;
     options = null;
   }
   options = options || {};
@@ -14026,7 +14157,7 @@ g = (function() {
 
 try {
 	// This works if eval is allowed (see CSP)
-	g = g || Function("return this")() || (1, eval)("this");
+	g = g || new Function("return this")();
 } catch (e) {
 	// This works if the window reference is available
 	if (typeof window === "object") g = window;
@@ -14066,9 +14197,8 @@ var _require = __webpack_require__(/*! ./common */ "./src/common.js"),
  */
 
 
-function docFromChanges(actorId, changes) {
-  if (!actorId) throw new RangeError('actorId is required in docFromChanges');
-  var doc = Frontend.init({ actorId: actorId, backend: Backend });
+function docFromChanges(options, changes) {
+  var doc = init(options);
 
   var _Backend$applyChanges = Backend.applyChanges(Backend.init(), changes),
       _Backend$applyChanges2 = _slicedToArray(_Backend$applyChanges, 2),
@@ -14082,8 +14212,24 @@ function docFromChanges(actorId, changes) {
 
 ///// Automerge.* API
 
-function init(actorId) {
-  return Frontend.init({ actorId: actorId, backend: Backend });
+function init(options) {
+  if (typeof options === 'string') {
+    options = { actorId: options };
+  } else if (typeof options === 'undefined') {
+    options = {};
+  } else if (!isObject(options)) {
+    throw new TypeError('Unsupported options for init(): ' + options);
+  }
+  return Frontend.init(Object.assign({ backend: Backend }, options));
+}
+
+/**
+ * Returns a new document object initialized with the given state.
+ */
+function from(initialState, options) {
+  return change(init(options), 'Initialization', function (doc) {
+    return Object.assign(doc, initialState);
+  });
 }
 
 function change(doc, message, callback) {
@@ -14122,8 +14268,8 @@ function redo(doc, message) {
   return newDoc;
 }
 
-function load(string, actorId) {
-  return docFromChanges(actorId || uuid(), transit.fromJSON(string));
+function load(string, options) {
+  return docFromChanges(options, transit.fromJSON(string));
 }
 
 function save(doc) {
@@ -14212,7 +14358,7 @@ function getHistory(doc) {
 }
 
 module.exports = {
-  init: init, change: change, emptyChange: emptyChange, undo: undo, redo: redo,
+  init: init, from: from, change: change, emptyChange: emptyChange, undo: undo, redo: redo,
   load: load, save: save, merge: merge, diff: diff, getChanges: getChanges, applyChanges: applyChanges, getMissingDeps: getMissingDeps,
   equals: equals, getHistory: getHistory, uuid: uuid,
   Frontend: Frontend, Backend: Backend,
@@ -14248,6 +14394,41 @@ function isObject(obj) {
 }
 
 /**
+ * Returns a shallow copy of the object `obj`. Faster than `Object.assign({}, obj)`.
+ * https://jsperf.com/cloning-large-objects/1
+ */
+function copyObject(obj) {
+  if (!isObject(obj)) return {};
+  var copy = {};
+  var _iteratorNormalCompletion = true;
+  var _didIteratorError = false;
+  var _iteratorError = undefined;
+
+  try {
+    for (var _iterator = Object.keys(obj)[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+      var key = _step.value;
+
+      copy[key] = obj[key];
+    }
+  } catch (err) {
+    _didIteratorError = true;
+    _iteratorError = err;
+  } finally {
+    try {
+      if (!_iteratorNormalCompletion && _iterator.return) {
+        _iterator.return();
+      }
+    } finally {
+      if (_didIteratorError) {
+        throw _iteratorError;
+      }
+    }
+  }
+
+  return copy;
+}
+
+/**
  * Returns true if all components of `clock1` are less than or equal to those
  * of `clock2` (both clocks given as Immutable.js Map objects). Returns false
  * if there is at least one component in which `clock1` is greater than
@@ -14274,7 +14455,7 @@ function parseElemId(elemId) {
 }
 
 module.exports = {
-  ROOT_ID: ROOT_ID, isObject: isObject, lessOrEqual: lessOrEqual, parseElemId: parseElemId
+  ROOT_ID: ROOT_ID, isObject: isObject, copyObject: copyObject, lessOrEqual: lessOrEqual, parseElemId: parseElemId
 };
 
 /***/ }),
