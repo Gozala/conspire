@@ -127,7 +127,7 @@ export class RichText {
       const tokens =
         marker || Dictionary.isEmpty(attributes)
           ? [Marker.from(attributes), "\n"]
-          : [Marker.from(attributes), "\n", Marker.clear()]
+          : [Marker.from(attributes), "\n", Marker.from({ ...this.attributes })]
 
       this.content.insertAt(this.position, ...tokens)
       this.position += tokens.length

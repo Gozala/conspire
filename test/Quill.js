@@ -340,3 +340,45 @@ test("insert after marker", assert => {
   assert.equal(text.length, 13, `text length === ${text.length}`)
   assert.equal(text.size, 15, `node size is ${text.size}`)
 })
+
+test("split formatted block", assert => {
+  const text = createQuillRichText().patch({
+    ops: [
+      {
+        insert: "Hello "
+      },
+      {
+        attributes: {
+          italic: true
+        },
+        insert: "beautiful"
+      },
+      {
+        insert: " world"
+      },
+      {
+        attributes: {
+          header: 1
+        },
+        insert: "\n"
+      }
+    ]
+  })
+  assert.equal(
+    text.inspect(),
+    `<RichText>Hello {"italic":true}beautiful{} world{"header":1}\n{}</RichText>`
+  )
+  assert.equal(text.length, 22, `text length === ${text.length}`)
+  assert.equal(text.size, 26, `node size is ${text.size}`)
+
+  text.patch({
+    ops: [{ retain: 10 }, { insert: "\n", attributes: { header: 1 } }]
+  })
+
+  assert.equal(
+    text.inspect(),
+    `<RichText>Hello {"italic":true}beau{"header":1}\n{"italic":true}tiful{} world{"header":1}\n{}</RichText>`
+  )
+  assert.equal(text.length, 23, `text length === ${text.length}`)
+  assert.equal(text.size, 29, `node size is ${text.size}`)
+})
