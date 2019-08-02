@@ -1,15 +1,23 @@
 body {
   display: flex;
   position: absolute;
-  height: 90%;
+  height: 50%;
   width: 100%;
+  margin: 0;
 }
 
-article {
+section {
+  flex: 1;
   border: 1px solid lightgray;
   height: auto;
 }
-#bob,
-#alice {
+
+section,
+pre {
   margin: 30px;
+}
+
+.messages {
+  flex-direction: row-reverse;
+  overflow-x: auto;
 }

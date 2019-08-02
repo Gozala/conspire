@@ -13,9 +13,35 @@
     <script src="./dat/conspire.gozala.io/main.js" type="module" async defer></script>
   </head>
   <body>
-    <article id="alice">
-    </article>
-    <article id="bob">
-    </article>
+    <section id="alice">
+      <article class="editor input"></article>
+      <details>
+        <summary>Alice CRDT State</summary>
+        <pre class="crdt state"></pre>
+      </details>
+      <details>
+        <summary>Alice Editor State</summary>
+        <pre class="editor state"></pre>
+      </details>
+      <details>
+        <summary>Messages</summary>
+        <article class="messages"></article>
+      </details>
+    </section>
+    <section id="bob">
+      <article class="editor input"></article>
+      <details>
+        <summary>Bob CRDT State</summary>
+        <pre class="crdt state"></pre>
+      </details>
+      <details>
+          <summary>Bob Editor State</summary>
+          <pre class="editor state"></pre>
+      </details>
+      <details>
+          <summary>Messages</summary>
+          <article class="messages"></article>
+        </details>
+    </section>
   </body>
 </html>

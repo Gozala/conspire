@@ -36,6 +36,9 @@ class Tokens /*::<a>*/ {
 }
 
 class Conspirator {
+  /**::
+  root:HTMLElement
+  */
   constructor(name) {
     this.id = `${name}@${Date.now().toString(32)}`
     this.feed = new FeedWriter(name)
@@ -48,24 +51,22 @@ class Conspirator {
   follow(actor) {
     this.repo.follow(actor.feed)
   }
-  init(node) {
-    this.view(node)
+  init(root) {
+    this.root = root
+    this.view()
     this.repo.change(doc => {
       doc.content = [] //new Automerge.Text()
       doc.cursors = {}
 
-      new QuillRichText(new Tokens(doc.content)).patch(
-        this.editor.getContents()
-      )
+      const text = new QuillRichText(new Tokens(doc.content))
+      text.patch(this.editor.getContents())
 
       doc.cursors[this.id] = this.editor.getSelection()
     }, "init")
+    this.inspect()
   }
-  // sizeOf(fragment) {
-  //   const size = fragment.insert instanceof Text ? fragment.insert.length : 1
-  //   return size
-  // }
   merge(patch) {
+    this.log(patch)
     this.repo.change(doc => {
       if (patch.delta) {
         const text = new QuillRichText(new Tokens(doc.content))
@@ -75,83 +76,8 @@ class Conspirator {
       if (patch.selection) {
         doc.cursors[this.id] = patch.selection
       }
-
-      // const content = doc.content
-      // let position = 0
-      // let index = 0
-      // let offset = 0
-
-      // for (const op of patch.ops) {
-      //   switch (op.type) {
-      //     case "select": {
-      //       if (op.select) {
-      //         doc.cursors[this.id] = op.select
-      //       }
-      //       break
-      //     }
-      //     case "delete": {
-      //       let length = op.delete
-      //       while (length > 0) {
-      //         const fragment = content[index]
-      //         const size = this.sizeOf(fragment)
-
-      //         if (offset + length < size) {
-      //           fragment.insert.deleteAt(offset, length)
-      //           length = 0
-      //         } else {
-      //           if (offset === 0) {
-      //             content.deleteAt(index)
-      //             length -= size
-      //           } else {
-      //             fragment.insert.deleteAt(offset, size - offset)
-      //             length -= size - offset
-      //             index += 1
-      //             offset = 0
-      //           }
-      //         }
-      //       }
-      //       break
-      //     }
-      //     case "retain": {
-      //       let length = op.retain
-      //       while (length > 0) {
-      //         const fragment = content[index]
-      //         const size = this.sizeOf(fragment)
-
-      //         if (offset + length < size) {
-      //           if (fragment.attributes) {
-      //           }
-      //           fragment.insert.deleteAt(offset, length)
-      //           length = 0
-      //         } else {
-      //           if (offset === 0) {
-      //             content.deleteAt(index)
-      //             length -= size
-      //           } else {
-      //             fragment.insert.deleteAt(offset, size - offset)
-      //             length -= size - offset
-      //             index += 1
-      //             offset = 0
-      //           }
-      //         }
-      //       }
-      //     }
-      //     case "insert": {
-      //       const { insert, attributes } = op
-      //       if (typeof insert === "string") {
-      //         doc.content.insertAt(offset, {
-      //           insert: new Automerge.Text(),
-      //           attributes
-      //         })
-      //         doc.content[offset].insert.insertAt(0, ...insert.split(""))
-      //       } else {
-      //         doc.content.insertAt(offset, insert)
-      //       }
-      //       break
-      //     }
-      //   }
-      // }
     })
+    this.inspect()
   }
   async watch() {
     for await (const { member, message } of this.thread.messages) {
@@ -160,28 +86,11 @@ class Conspirator {
       }
     }
   }
-  // toDelta(content) {
-  //   const delta = { ops: [] }
-  //   for (const op of ops) {
-  //     if (op.retain) {
-  //       delta.ops.push(op)
-  //     } else if (op.delete) {
-  //       delta.ops.push(op)
-  //     } else if (op.insert instanceof Automerge.Text) {
-  //       const insert = op.insert.join("")
-  //       delta.ops.push({ insert, attributes: op.attributes })
-  //     } else {
-  //       delta.ops.push(op)
-  //     }
-  //   }
-  //   return delta
-  // }
   receive(message) {
     const cursors = this.document.cursors || {}
     this.repo.applyChanges(message)
-    const delta = new QuillRichText(
-      new Tokens(this.document.content)
-    ).toContent()
+    const text = new QuillRichText(new Tokens(this.document.content))
+    const delta = text.toContent()
     this.editor.setContents(delta)
     for (const name in this.document.cursors) {
       const cursor = this.document.cursors[name]
@@ -194,12 +103,14 @@ class Conspirator {
         this.cursors.moveCursor(name, cursor)
       }
     }
+
+    this.inspect()
   }
   get cursors() {
     return this.editor.getModule("cursors")
   }
-  view(node) {
-    this.editor = new Quill(node, {
+  view() {
+    this.editor = new Quill(this.root.querySelector(".editor.input"), {
       modules: {
         cursors: true,
         conspire: this,
@@ -219,6 +130,28 @@ class Conspirator {
     })
     this.watch()
     return this
+  }
+
+  log(message) {
+    const container = this.root.querySelector(".messages")
+    const row = document.createElement("pre")
+    row.textContent = JSON.stringify(message)
+    container.insertBefore(row, container.firstChild)
+    const [_1, _2, _3, _4, _5, ...rest] = container.childNodes
+    for (const child of rest) {
+      child.remove()
+    }
+  }
+  inspect() {
+    this.root.querySelector(".crdt.state").textContent = new QuillRichText(
+      new Tokens(this.document.content)
+    ).inspect()
+
+    this.root.querySelector(".editor.state").textContent = JSON.stringify(
+      this.editor.getContents(),
+      null,
+      2
+    )
   }
 }
 
