@@ -233,12 +233,12 @@ test("bold segment, delete segment, create header, insert", assert => {
       ]
     })
 
-  assert.equal(text.length, 24, `text.length === ${text.length}`)
-  assert.equal(text.size, 27, `text.size === ${text.size}`)
   assert.equal(
     text.inspect(),
     `<RichText>Gandalf {"bold":true}Grey{"header":1}\n{}\nmore text\n</RichText>`
   )
+  assert.equal(text.length, 24, `text.length === ${text.length}`)
+  assert.equal(text.size, 27, `text.size === ${text.size}`)
 
   assert.deepEqual(text.toContent(), {
     ops: [
@@ -304,4 +304,39 @@ test("overlap markers", assert => {
       { insert: " the Grey\n", attributes: {} }
     ]
   })
+})
+
+test("insert after marker", assert => {
+  const text = createQuillRichText().patch({
+    ops: [
+      {
+        insert: "Hello "
+      },
+      {
+        attributes: {
+          bold: true
+        },
+        insert: "World"
+      },
+      {
+        insert: "\n"
+      }
+    ]
+  })
+
+  assert.equal(
+    text.inspect(),
+    `<RichText>Hello {"bold":true}World{}\n</RichText>`
+  )
+  assert.equal(text.length, 12, `text length === ${text.length}`)
+  assert.equal(text.size, 14, `node size is ${text.size}`)
+
+  text.patch({ ops: [{ retain: 11 }, { insert: "!" }] })
+
+  assert.equal(
+    text.inspect(),
+    `<RichText>Hello {"bold":true}World{}!\n</RichText>`
+  )
+  assert.equal(text.length, 13, `text length === ${text.length}`)
+  assert.equal(text.size, 15, `node size is ${text.size}`)
 })

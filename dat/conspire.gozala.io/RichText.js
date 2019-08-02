@@ -1,12 +1,15 @@
 // @flow strict
 
+import * as Dictionary from "./Dictionary.js"
+
 /*::
 import type { MutableList } from "./MutableList.js"
 import type { Text } from "./automerge.js"
 import type { Delta } from "./quill.js"
 
-export type Resource = {[string]:string|number|boolean|null} 
-export type Attributes = {[string]:string|number|boolean|null}
+export type Value = string|number|boolean|null
+export type Resource = {[string]:Value} 
+export type Attributes = Dictionary.Mutable<Value>
 export type CharacterToken = string
 export type MarkerToken = {|attributes:Attributes, length:0|}
 export type EmbedToken = {|resource:Resource, attributes:?Attributes, length:1|}
@@ -65,7 +68,7 @@ export class RichText {
   /*::
   +content:RichTextBuffer
   position:number
-  attributes:Attributes
+  attributes:Dictionary.Immutable<Value>
   */
   constructor(content /*:RichTextBuffer*/) {
     this.content = content
@@ -94,28 +97,24 @@ export class RichText {
     return this
   }
   insertFormattedText(text /*:string*/, format /*:Attributes*/) {
+    const marker = Marker.match(this.content.get(this.position))
     // Compute attributes for the text being inserted by applying provided
     // format to the attributes the current position. It maybe application
     // of the format is redundant, to prevent redundant markers we start with
     // `null` attributes and compute changed attributes only once difference
     // is encountered.
-    let attributes = null
-    for (const name in format) {
-      const before = this.attributes[name]
-      const after = format[name]
-      if (before !== after) {
-        attributes = attributes || { ...this.attributes }
-        if (after == null) {
-          delete attributes[name]
-        } else {
-          attributes[name] = after
-        }
-      }
-    }
+    const attributes = Dictionary.mutable(format)
 
-    // If attributes is `null` then segment already has desired format & in
-    // that case we just insert plain text.
-    if (attributes == null) {
+    // If attributes at current position match the format then just insert the
+    // plain text.
+    if (Dictionary.equals(this.attributes, attributes)) {
+      this.insertPlainText(text)
+    }
+    // If next token is a marker with matching format then insert the plain text
+    // at next position.
+    else if (marker && Dictionary.equals(marker.attributes, attributes)) {
+      this.position++
+      this.attributes = marker.attributes
       this.insertPlainText(text)
     }
     // If inserted text is formatted `\n` that is Quill.js's way to format
@@ -125,7 +124,10 @@ export class RichText {
     // Ideally our data model would be free of such artifacts, but for the
     // time being & for the lack of better solution it's the way it is.
     else if (Block.match(text)) {
-      const tokens = [Marker.from(attributes), "\n", Marker.clear()]
+      const tokens =
+        marker || Dictionary.isEmpty(attributes)
+          ? [Marker.from(attributes), "\n"]
+          : [Marker.from(attributes), "\n", Marker.clear()]
 
       this.content.insertAt(this.position, ...tokens)
       this.position += tokens.length
@@ -137,15 +139,23 @@ export class RichText {
     else {
       this.content.insertAt(this.position, Marker.from(attributes))
       this.position++
+      this.attributes = attributes
       this.content.insertAt(this.position, ...text)
       this.position += text.length
 
       // If we reached end of the document resetting attributes seems redundant,
       // which is why we only reset attributes if we have not reached the end.
       if (this.position < this.content.length) {
-        this.content.insertAt(this.position, Marker.from(this.attributes))
+        const token = this.content.get(this.position + 1)
+        if (Marker.match(token) == null) {
+          this.content.insertAt(
+            this.position,
+            Marker.from({ ...this.attributes })
+          )
+        }
       }
     }
+
     return this
   }
   embed(resource /*:Resource*/, attributes /*::?:Attributes*/) {}
@@ -207,19 +217,17 @@ export class RichText {
 
     // If inserted right after "\n" need to check if it is formatted block, because format
     // will be reset right after.
-    const token = this.content.get(this.position)
-    if (
-      token &&
-      token.attributes != null &&
-      this.content.get(this.position - 1) === "\n"
-    ) {
+    const marker = Marker.match(this.content.get(this.position))
+    if (marker && this.content.get(this.position - 1) === "\n") {
       this.position++
+      this.attributes = marker.attributes
     }
+
     return this
   }
   static includeAttributes(
-    attributes /*:Attributes*/,
-    formatting /*:Attributes*/
+    attributes /*:Dictionary.Mutable<Value>*/,
+    formatting /*:Dictionary.Immutable<Value>*/
   ) {
     let marks = null
     for (const name in formatting) {
@@ -235,21 +243,6 @@ export class RichText {
       }
     }
     return marks
-  }
-  static equalAttributes(before /*:Attributes*/, after /*:Attributes*/) {
-    for (const name in after) {
-      if (before[name] !== after[name]) {
-        return false
-      }
-    }
-
-    for (const name in before) {
-      if (before[name] !== after[name]) {
-        return false
-      }
-    }
-
-    return true
   }
 
   format(count /*:number*/, format /*:Attributes*/) {
@@ -274,10 +267,10 @@ export class RichText {
       const marker = Marker.match(token)
       if (marker) {
         formatAfter = RichText.includeAttributes(marker.attributes, format)
-        if (RichText.equalAttributes(this.attributes, marker.attributes)) {
+        if (Dictionary.equals(this.attributes, marker.attributes)) {
           this.content.deleteAt(this.position, 1)
         } else {
-          this.attributes = marker.attributes
+          this.attributes = Dictionary.immutable(marker.attributes)
           this.position++
         }
       }
@@ -314,10 +307,12 @@ export class RichText {
     this.position = 0
     const token = this.content.length > 0 ? this.content.get(0) : null
     const marker = token && Marker.match(token)
-    this.attributes = marker ? marker.attributes : {}
-    if (position > 0) {
-      this.skip(position)
-    }
+    this.attributes = marker
+      ? Dictionary.immutable(marker.attributes)
+      : Dictionary.immutable()
+
+    this.skip(position)
+
     return this
   }
 

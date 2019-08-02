@@ -21,7 +21,7 @@ export const patch = (delta /*:Delta*/, text /*:RichText*/) /*:RichText*/ => {
     if (op.insert != null) {
       const insert = op.insert
       typeof insert == "string"
-        ? text.insert(insert, attributes)
+        ? text.insertFormattedText(insert, attributes || {})
         : text.embed(insert, attributes)
     }
     if (op.delete != null) {
