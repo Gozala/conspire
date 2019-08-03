@@ -7,7 +7,7 @@ import type { Delta, Embed, Insert } from "../quill.js"
 
 export class QuillRichText extends RichText {
   patch(delta /*:Delta*/) {
-    return patch(delta, this.reset())
+    return patch(delta, this)
   }
   toContent() {
     return toContent(this)
@@ -17,18 +17,27 @@ export class QuillRichText extends RichText {
 export const patch = (delta /*:Delta*/, text /*:RichText*/) /*:RichText*/ => {
   let position = 0
   for (const op of delta.ops) {
-    const attributes = op.attributes == null ? undefined : op.attributes
+    const attributes = op.attributes == null ? null : op.attributes
     if (op.insert != null) {
       const insert = op.insert
-      typeof insert == "string"
-        ? text.insertFormattedText(insert, attributes || {})
-        : text.embed(insert, attributes)
+      if (typeof insert == "string") {
+        text.insert(position, insert, attributes || {})
+        position += insert.length
+      } else {
+        text.embed(position, insert, attributes || {})
+        position += 1
+      }
     }
+
     if (op.delete != null) {
-      text.delete(op.delete)
+      text.delete(position, op.delete)
     }
+
     if (op.retain != null) {
-      text.retain(op.retain, attributes)
+      if (attributes) {
+        text.format(position, op.retain, attributes)
+      }
+      position += op.retain
     }
   }
 
@@ -39,7 +48,7 @@ export const toContent = (text /*:RichText*/) /*:Delta*/ => {
   const ops = []
   let attributes = null
   let segment = ""
-  for (const token of [...text.content, { length: 0, attributes: null }]) {
+  for (const token of [...text.tokens, { length: 0, attributes: null }]) {
     if (typeof token === "string") {
       segment += token
     } else {

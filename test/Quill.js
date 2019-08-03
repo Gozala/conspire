@@ -1,6 +1,7 @@
 // @flow strict
 import {
   QuillRichText,
+  Marker,
   MutableList,
   patch,
   createQuillRichText,
@@ -18,8 +19,10 @@ test("simple insert", assert => {
 
   assert.equal(text.length, 17, `text length is ${text.length}`)
   assert.equal(text.size, 17, `node size is ${text.size}`)
-  assert.equal(text.inspect(), "<RichText>Gandalf the Grey\n</RichText>")
-
+  assert.deepEqual([...text.entries()], ["Gandalf the Grey\n"])
+  assert.deepEqual(text.toJSON(), [
+    { text: "Gandalf the Grey\n", attributes: {} }
+  ])
   assert.deepEqual(text.toContent(), {
     ops: [
       {
@@ -54,10 +57,17 @@ test("bold segment", assert => {
 
   assert.equal(text.length, 17, `text length is ${text.length}`)
   assert.equal(text.size, 19, `node size is ${text.size}`)
-  assert.equal(
-    text.inspect(),
-    `<RichText>Gandalf the {"bold":true}Grey{}\n</RichText>`
+  assert.deepEqual(
+    [...text.entries()],
+    ["Gandalf the ", Marker.from({ bold: true }), "Grey", Marker.clear(), "\n"]
   )
+
+  assert.deepEqual(text.toJSON(), [
+    { text: "Gandalf the ", attributes: {} },
+    { text: "Grey", attributes: { bold: true } },
+    { text: "\n", attributes: {} }
+  ])
+
   assert.deepEqual(text.toContent(), {
     ops: [
       { insert: "Gandalf the " },
@@ -102,10 +112,11 @@ test("bold segment, delete segment", assert => {
 
   assert.equal(text.length, 13, `text.length === ${text.length}`)
   assert.equal(text.size, 15, `text.size === ${text.size}`)
-  assert.equal(
-    text.inspect(),
-    `<RichText>Gandalf {"bold":true}Grey{}\n</RichText>`
+  assert.deepEqual(
+    [...text.entries()],
+    ["Gandalf ", Marker.from({ bold: true }), "Grey", Marker.clear(), "\n"]
   )
+
   assert.deepEqual(text.toContent(), {
     ops: [
       { insert: "Gandalf " },
@@ -113,6 +124,12 @@ test("bold segment, delete segment", assert => {
       { insert: "\n", attributes: {} }
     ]
   })
+
+  assert.deepEqual(text.toJSON(), [
+    { text: "Gandalf ", attributes: {} },
+    { text: "Grey", attributes: { bold: true } },
+    { text: "\n", attributes: {} }
+  ])
 })
 
 test("bold segment, delete segment, create header", assert => {
@@ -162,12 +179,22 @@ test("bold segment, delete segment, create header", assert => {
     })
 
   assert.equal(text.length, 13, `text.length === ${text.length}`)
-  assert.equal(text.size, 16, `text.size === ${text.size}`)
-  assert.equal(
-    text.inspect(),
-    `<RichText>Gandalf {"bold":true}Grey{"header":1}\n{}</RichText>`
+  assert.equal(text.size, 15, `text.size === ${text.size}`)
+  assert.deepEqual(
+    [...text.entries()],
+    [
+      "Gandalf ",
+      Marker.from({ bold: true }),
+      "Grey",
+      Marker.from({ header: 1 }),
+      "\n"
+    ]
   )
-
+  assert.deepEqual(text.toJSON(), [
+    { text: "Gandalf ", attributes: {} },
+    { text: "Grey", attributes: { bold: true } },
+    { text: "\n", attributes: { header: 1 } }
+  ])
   assert.deepEqual(text.toContent(), {
     ops: [
       { insert: "Gandalf " },
@@ -178,65 +205,100 @@ test("bold segment, delete segment, create header", assert => {
 })
 
 test("bold segment, delete segment, create header, insert", assert => {
-  const text = createQuillRichText()
-    .patch({
-      ops: [
-        {
-          insert: "Gandalf the Grey\n"
-        }
-      ]
-    })
-    .patch({
-      ops: [
-        {
-          retain: 12
-        },
-        {
-          retain: 4,
-          attributes: {
-            bold: true
-          }
-        }
-      ]
-    })
-    .patch({
-      ops: [
-        {
-          retain: 8
-        },
-        {
-          delete: 4
-        }
-      ]
-    })
-    .patch({
-      ops: [
-        {
-          retain: 12
-        },
-        {
-          retain: 1,
-          attributes: {
-            header: 1
-          }
-        }
-      ]
-    })
-    .patch({
-      ops: [
-        {
-          retain: 13
-        },
-        {
-          insert: "\nmore text\n"
-        }
-      ]
-    })
+  const text = createQuillRichText().patch({
+    ops: [
+      {
+        insert: "Gandalf the Grey\n"
+      }
+    ]
+  })
 
-  assert.equal(
-    text.inspect(),
-    `<RichText>Gandalf {"bold":true}Grey{"header":1}\n{}\nmore text\n</RichText>`
+  assert.deepEqual([...text.entries()], ["Gandalf the Grey\n"])
+
+  text.patch({
+    ops: [
+      {
+        retain: 12
+      },
+      {
+        retain: 4,
+        attributes: {
+          bold: true
+        }
+      }
+    ]
+  })
+
+  assert.deepEqual(
+    [...text.entries()],
+    ["Gandalf the ", Marker.from({ bold: true }), "Grey", Marker.clear(), "\n"]
   )
+
+  text.patch({
+    ops: [
+      {
+        retain: 8
+      },
+      {
+        delete: 4
+      }
+    ]
+  })
+
+  assert.deepEqual(
+    [...text.entries()],
+    ["Gandalf ", Marker.from({ bold: true }), "Grey", Marker.clear(), "\n"]
+  )
+
+  text.patch({
+    ops: [
+      {
+        retain: 12
+      },
+      {
+        retain: 1,
+        attributes: {
+          header: 1
+        }
+      }
+    ]
+  })
+
+  assert.deepEqual(
+    [...text.entries()],
+    [
+      "Gandalf ",
+      Marker.from({ bold: true }),
+      "Grey",
+      Marker.from({ header: 1 }),
+      "\n"
+    ]
+  )
+
+  text.patch({
+    ops: [
+      {
+        retain: 13
+      },
+      {
+        insert: "\nmore text\n"
+      }
+    ]
+  })
+
+  assert.deepEqual(
+    [...text.entries()],
+    [
+      "Gandalf ",
+      Marker.from({ bold: true }),
+      "Grey",
+      Marker.from({ header: 1 }),
+      "\n",
+      Marker.clear(),
+      "\nmore text\n"
+    ]
+  )
+
   assert.equal(text.length, 24, `text.length === ${text.length}`)
   assert.equal(text.size, 27, `text.size === ${text.size}`)
 
@@ -275,9 +337,16 @@ test("overlap markers", assert => {
 
   assert.equal(text.length, 17, `text length === ${text.length}`)
   assert.equal(text.size, 19, `node size is ${text.size}`)
-  assert.equal(
-    text.inspect(),
-    `<RichText>Gan{"bold":true}dalf{} the Grey\n</RichText>`
+  assert.deepEqual(
+    [...text.entries()],
+    ["Gan", Marker.from({ bold: true }), "dalf", Marker.clear(), " the Grey\n"]
+  )
+  assert.deepEqual(
+    text.toJSON()[
+      ({ text: "Gan", attributes: {} },
+      { text: "dalf", attributes: { bold: true } },
+      { text: " the Grey\n", attributes: {} })
+    ]
   )
 
   text.patch({
@@ -291,12 +360,16 @@ test("overlap markers", assert => {
     ]
   })
 
+  assert.deepEqual(
+    [...text.entries()],
+    [Marker.from({ bold: true }), "Gandalf", Marker.clear(), " the Grey\n"]
+  )
+  assert.deepEqual(text.toJSON(), [
+    { text: "Gandalf", attributes: { bold: true } },
+    { text: " the Grey\n", attributes: {} }
+  ])
   assert.equal(text.length, 17, `text length === ${text.length}`)
   assert.equal(text.size, 19, `node size is ${text.size}`)
-  assert.equal(
-    text.inspect(),
-    `<RichText>{"bold":true}Gandalf{} the Grey\n</RichText>`
-  )
 
   assert.deepEqual(text.toContent(), {
     ops: [
@@ -324,21 +397,41 @@ test("insert after marker", assert => {
     ]
   })
 
-  assert.equal(
-    text.inspect(),
-    `<RichText>Hello {"bold":true}World{}\n</RichText>`
+  assert.deepEqual(
+    [...text.entries()],
+    ["Hello ", Marker.from({ bold: true }), "World", Marker.clear(), "\n"]
   )
+  assert.deepEqual(text.toJSON(), [
+    { text: "Hello ", attributes: {} },
+    { text: "World", attributes: { bold: true } },
+    { text: "\n", attributes: {} }
+  ])
   assert.equal(text.length, 12, `text length === ${text.length}`)
   assert.equal(text.size, 14, `node size is ${text.size}`)
 
   text.patch({ ops: [{ retain: 11 }, { insert: "!" }] })
 
-  assert.equal(
-    text.inspect(),
-    `<RichText>Hello {"bold":true}World{}!\n</RichText>`
+  assert.deepEqual(
+    [...text.entries()],
+    ["Hello ", Marker.from({ bold: true }), "World", Marker.clear(), "!\n"]
   )
+
   assert.equal(text.length, 13, `text length === ${text.length}`)
   assert.equal(text.size, 15, `node size is ${text.size}`)
+
+  assert.deepEqual(text.toJSON(), [
+    { text: "Hello ", attributes: {} },
+    { text: "World", attributes: { bold: true } },
+    { text: "!\n", attributes: {} }
+  ])
+
+  assert.deepEqual(text.toContent(), {
+    ops: [
+      { insert: "Hello " },
+      { insert: "World", attributes: { bold: true } },
+      { insert: "!\n", attributes: {} }
+    ]
+  })
 })
 
 test("split formatted block", assert => {
@@ -364,21 +457,76 @@ test("split formatted block", assert => {
       }
     ]
   })
-  assert.equal(
-    text.inspect(),
-    `<RichText>Hello {"italic":true}beautiful{} world{"header":1}\n{}</RichText>`
+
+  assert.deepEqual(
+    [...text.entries()],
+    [
+      "Hello ",
+      Marker.from({ italic: true }),
+      "beautiful",
+      Marker.clear(),
+      " world",
+      Marker.from({ header: 1 }),
+      "\n"
+    ]
   )
+  assert.deepEqual(text.toJSON(), [
+    { text: "Hello ", attributes: {} },
+    { text: "beautiful", attributes: { italic: true } },
+    { text: " world", attributes: {} },
+    { text: "\n", attributes: { header: 1 } }
+  ])
+  assert.deepEqual(text.toContent(), {
+    ops: [
+      { insert: "Hello " },
+      { insert: "beautiful", attributes: { italic: true } },
+      { insert: " world", attributes: {} },
+      { insert: "\n", attributes: { header: 1 } }
+    ]
+  })
+
   assert.equal(text.length, 22, `text length === ${text.length}`)
-  assert.equal(text.size, 26, `node size is ${text.size}`)
+  assert.equal(text.size, 25, `node size is ${text.size}`)
 
   text.patch({
     ops: [{ retain: 10 }, { insert: "\n", attributes: { header: 1 } }]
   })
 
-  assert.equal(
-    text.inspect(),
-    `<RichText>Hello {"italic":true}beau{"header":1}\n{"italic":true}tiful{} world{"header":1}\n{}</RichText>`
+  assert.deepEqual(
+    [...text.entries()],
+    [
+      "Hello ",
+      Marker.from({ italic: true }),
+      "beau",
+      Marker.from({ header: 1 }),
+      "\n",
+      Marker.from({ italic: true }),
+      "tiful",
+      Marker.clear(),
+      " world",
+      Marker.from({ header: 1 }),
+      "\n"
+    ]
   )
+  assert.deepEqual(text.toJSON(), [
+    { text: "Hello ", attributes: {} },
+    { text: "beau", attributes: { italic: true } },
+    { text: "\n", attributes: { header: 1 } },
+    { text: "tiful", attributes: { italic: true } },
+    { text: " world", attributes: {} },
+    { text: "\n", attributes: { header: 1 } }
+  ])
+  assert.deepEqual(text.toContent(), {
+    ops: [
+      { insert: "Hello " },
+      { insert: "beau", attributes: { italic: true } },
+      { insert: "\n", attributes: { header: 1 } },
+      { insert: "tiful", attributes: { italic: true } },
+      { insert: " world", attributes: {} },
+      { insert: "\n", attributes: { header: 1 } }
+    ]
+  })
+
   assert.equal(text.length, 23, `text length === ${text.length}`)
-  assert.equal(text.size, 29, `node size is ${text.size}`)
+  assert.equal(text.size, 28, `node size is ${text.size}`)
 })

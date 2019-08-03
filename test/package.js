@@ -1,4 +1,4 @@
-import { RichText } from "../dat/conspire.gozala.io/RichText.js"
+import { RichText, Marker } from "../dat/conspire.gozala.io/RichText.js"
 import { MutableList } from "../dat/conspire.gozala.io/MutableList.js"
 import {
   patch,
@@ -18,6 +18,7 @@ const createQuillRichText = (tokens /*:Token[]*/ = []) =>
 
 export {
   RichText,
+  Marker,
   MutableList,
   QuillRichText,
   patch,

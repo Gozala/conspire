@@ -48,7 +48,7 @@ class Embed {
   }
 }
 
-class Marker {
+export class Marker {
   static match(token /*:Token*/) /*:?MarkerToken*/ {
     if (typeof token === "object" && token.length === 0) {
       return token
@@ -66,265 +66,271 @@ class Marker {
 
 export class RichText {
   /*::
-  +content:RichTextBuffer
+  +tokens:RichTextBuffer
+  offset:number
   position:number
   attributes:Dictionary.Immutable<Value>
   */
-  constructor(content /*:RichTextBuffer*/) {
-    this.content = content
-    this.reset(0)
+  constructor(tokens /*:RichTextBuffer*/) {
+    this.tokens = tokens
+    this.attributes = Dictionary.immutable()
+    this.offset = 0
+    this.position = 0
   }
-  get length() {
-    let length = 0
-    for (const token of this.content) {
-      length += token.length
-    }
-    return length
-  }
-  get size() {
-    return this.content.length
-  }
-  insert(text /*:string*/, attributes /*::?:Attributes*/) {
-    if (attributes == null) {
-      return this.insertPlainText(text)
-    } else {
-      return this.insertFormattedText(text, attributes)
-    }
-  }
-  insertPlainText(text /*:string*/) {
-    this.content.insertAt(this.position, ...text)
-    this.position += text.length
-    return this
-  }
-  insertFormattedText(text /*:string*/, format /*:Attributes*/) {
-    const marker = Marker.match(this.content.get(this.position))
-    // Compute attributes for the text being inserted by applying provided
-    // format to the attributes the current position. It maybe application
-    // of the format is redundant, to prevent redundant markers we start with
-    // `null` attributes and compute changed attributes only once difference
-    // is encountered.
-    const attributes = Dictionary.mutable(format)
-
-    // If attributes at current position match the format then just insert the
-    // plain text.
-    if (Dictionary.equals(this.attributes, attributes)) {
-      this.insertPlainText(text)
-    }
-    // If next token is a marker with matching format then insert the plain text
-    // at next position.
-    else if (marker && Dictionary.equals(marker.attributes, attributes)) {
-      this.position++
-      this.attributes = marker.attributes
-      this.insertPlainText(text)
-    }
-    // If inserted text is formatted `\n` that is Quill.js's way to format
-    // preceding line in a block. If that is the case just clear out all
-    // attributes right after the inserted `\n`.
-    // TODO: This seems really awkward & is artifact of Quill.js data model.
-    // Ideally our data model would be free of such artifacts, but for the
-    // time being & for the lack of better solution it's the way it is.
-    else if (Block.match(text)) {
-      const tokens =
-        marker || Dictionary.isEmpty(attributes)
-          ? [Marker.from(attributes), "\n"]
-          : [Marker.from(attributes), "\n", Marker.from({ ...this.attributes })]
-
-      this.content.insertAt(this.position, ...tokens)
-      this.position += tokens.length
-    }
-    // Otherwise we insert:
-    // 1. Marker for computed attributes
-    // 2. Formatted text segment
-    // 3. Marker to reset attributes (to the way they were prior to 1.)
-    else {
-      this.content.insertAt(this.position, Marker.from(attributes))
-      this.position++
-      this.attributes = attributes
-      this.content.insertAt(this.position, ...text)
-      this.position += text.length
-
-      // If we reached end of the document resetting attributes seems redundant,
-      // which is why we only reset attributes if we have not reached the end.
-      if (this.position < this.content.length) {
-        const token = this.content.get(this.position + 1)
-        if (Marker.match(token) == null) {
-          this.content.insertAt(
-            this.position,
-            Marker.from({ ...this.attributes })
-          )
-        }
+  toString() {
+    let text = ""
+    for (const token of this.tokens) {
+      if (typeof token === "string") {
+        text += token
       }
     }
+    return text
+  }
+  get length() {
+    return this.toString().length
+  }
+  get size() {
+    return this.tokens.length
+  }
+  get(index /*:number*/) {
+    let { offset, size } = this.reset(index)
+    // Note we use <= so that get will do whatever it does with
+    // `Automerge.Text` when index is off bounds
+    while (offset <= size) {
+      const token = this.tokens.get(this.offset)
+      if (typeof token === "string") {
+        return token
+      } else {
+        offset++
+      }
+    }
+  }
+  _reset(index /*:number*/ = 0) {
+    if (this.position === index) {
+      return this
+    }
+    console.log("RESET", { index, position: this.position })
+
+    this.position = 0
+    this.offset = 0
+    this.attributes = Dictionary.immutable()
+    let n = index
+    while (n > 0) {
+      const token = this.tokens.get(this.offset)
+      const marker = Marker.match(token)
+      if (marker) {
+        this.attributes = marker.attributes
+      } else {
+        this.position += 1
+        n -= 1
+      }
+      this.offset += 1
+    }
 
     return this
   }
-  embed(resource /*:Resource*/, attributes /*::?:Attributes*/) {}
-  delete(count /*:number*/) {
-    let n = count
+  reset(index /*:number*/ = 0) {
+    let { position, offset } = this
+    if (position <= index) {
+      let n = index - position
+      while (n > 0) {
+        const token = this.tokens.get(offset)
+        const marker = Marker.match(token)
+        if (marker) {
+          this.attributes = marker.attributes
+        } else {
+          position += 1
+          n -= 1
+        }
+        offset += 1
+      }
+      // } else if (index <= position - index) {
+    } else {
+      let n = index
+      position = 0
+      offset = 0
+      this.attributes = Dictionary.immutable()
+      while (n > 0) {
+        const token = this.tokens.get(offset)
+        const marker = Marker.match(token)
+        if (marker) {
+          this.attributes = marker.attributes
+        } else {
+          position += 1
+          n -= 1
+        }
+        offset += 1
+      }
+    }
+    // else {
+    //   let n = position - index
+    //   while (n > 0) {
+    //     const token = this.tokens.get(offset)
+    //     const marker = Marker.match(token)
+    //     if (marker) {
+    //       this.attributes = marker.attributes
+    //     } else {
+    //       position -= 1
+    //       n -= 1
+    //     }
+    //     offset -= 1
+    //   }
+    // }
+    this.offset = offset
+    this.position = position
+
+    return this
+  }
+  insert(
+    index /*:number*/,
+    text /*:string*/,
+    attributes /*:?Attributes*/ = null
+  ) {
+    this.reset(index)
+    this.tokens.insertAt(this.offset, ...text)
+    if (attributes != null) {
+      this.format(index, text.length, attributes)
+    }
+    this.reset(index + text.length)
+    return this
+  }
+  embed(index /*:number*/, resource /*:Resource*/, attributes /*:Attributes*/) {
+    this.reset(index)
+    this.tokens.insertAt(this.offset, Embed.new(resource, attributes))
+    this.position++
+    this.offset++
+  }
+  delete(index /*:number*/, size /*:number*/) {
+    let n = size
     // Traverse the content to see how many marks delete spans across.
     // If 0 we can just delete, otherwise we need to retain last mark
     // so that formatting of content following delete segment will be
     // retained.
     let marks = 0
-    let lastMarkPosition = -1
-    let { position } = this
+    let lastMarkOffset = -1
+    let { offset, position } = this.reset(index)
     while (n > 0) {
-      const token = this.content.get(position)
+      const token = this.tokens.get(offset)
       if (Marker.match(token)) {
         marks++
-        lastMarkPosition = position
+        lastMarkOffset = offset
       }
 
       n -= token.length
-      position++
+      offset++
     }
 
-    // If no marks were found or current position is a marker itself
+    // If no marks were found or current offset is a marker itself
     // it is safe to delete.
-    if (marks === 0 || this.content.get(position).attributes) {
-      this.content.deleteAt(this.position, count + marks)
+    if (marks === 0 || Marker.match(this.tokens.get(offset))) {
+      this.tokens.deleteAt(this.offset, size + marks)
     }
     // If delete span across non 0 marks and is not followed by a mark
     // then we want to retain last mark. To do so we delete everything
     // prior to the last mark and then delete remaning characters past
     // mark.
     else {
-      this.content.deleteAt(this.position, lastMarkPosition - this.position)
-      const remaining = count - (lastMarkPosition - this.position)
-      this.position++
-      this.content.deleteAt(this.position, remaining)
+      this.tokens.deleteAt(this.offset, lastMarkOffset - this.offset)
+      const remaining = size - (lastMarkOffset - this.offset)
+      this.tokens.deleteAt(this.offset + 1, remaining)
     }
     return this
   }
-  retain(count /*:number*/, attributes /*::?:Attributes*/) {
-    if (attributes) {
-      return this.format(count, attributes)
-    } else {
-      return this.skip(count)
-    }
-  }
-  skip(count /*:number*/) {
-    let n = count
-    while (n > 0) {
-      const token = this.content.get(this.position)
-      n -= token.length
-      const marker = Marker.match(token)
-      if (marker) {
-        this.attributes = marker.attributes
-      }
-      this.position++
-    }
+  format(index /*:number*/, size /*:number*/, format /*:Attributes*/) {
+    let n = size
+    let { attributes, offset, position } = this.reset(index)
 
-    // If inserted right after "\n" need to check if it is formatted block, because format
-    // will be reset right after.
-    const marker = Marker.match(this.content.get(this.position))
-    if (marker && this.content.get(this.position - 1) === "\n") {
-      this.position++
-      this.attributes = marker.attributes
+    if (!Dictionary.equals(attributes, format)) {
+      this.tokens.insertAt(offset, Marker.from(format))
+      offset++
     }
-
-    return this
-  }
-  static includeAttributes(
-    attributes /*:Dictionary.Mutable<Value>*/,
-    formatting /*:Dictionary.Immutable<Value>*/
-  ) {
-    let marks = null
-    for (const name in formatting) {
-      const before = attributes[name]
-      const after = formatting[name]
-      if (before !== after) {
-        marks = marks || { ...attributes }
-        if (after == null) {
-          delete attributes[name]
-        } else {
-          attributes[name] = after
-        }
-      }
-    }
-    return marks
-  }
-
-  format(count /*:number*/, format /*:Attributes*/) {
-    let n = count
-    let formatAfter = null
-    const { attributes } = this
-
-    // If current position does not match a marker we need to split the section
-    // at the current position & insert copy of the active attributes in order
-    // to format following section with given `format`.
-    const token = this.content.get(this.position)
-    const marker = Marker.match(token)
-    if (marker == null && attributes) {
-      this.content.insertAt(this.position, Marker.from({ ...attributes }))
-    }
-
-    // Section tracks text that has being formatted.
-    let section = ""
 
     while (n > 0) {
-      const token = this.content.get(this.position)
+      const token = this.tokens.get(offset)
       const marker = Marker.match(token)
+
       if (marker) {
-        formatAfter = RichText.includeAttributes(marker.attributes, format)
-        if (Dictionary.equals(this.attributes, marker.attributes)) {
-          this.content.deleteAt(this.position, 1)
-        } else {
-          this.attributes = Dictionary.immutable(marker.attributes)
-          this.position++
-        }
-      }
-
-      const embed = Embed.match(token)
-      if (embed) {
-        if (embed.attributes) {
-          RichText.includeAttributes(embed.attributes, format)
-        } else {
-          embed.attributes = { ...format }
-        }
-        this.position++
-      }
-
-      if (typeof token === "string") {
-        section += token.toString()
-        n--
-        this.position++
-      }
-    }
-
-    if (section === "\n") {
-      this.content.insertAt(this.position, Marker.clear())
-    } else if (formatAfter && this.position < this.content.length) {
-      const token = this.content.get(this.position)
-      if (!Marker.match(token)) {
-        this.content.insertAt(this.position, Marker.from(formatAfter))
-      }
-    }
-
-    return this
-  }
-  reset(position /*:number*/ = 0) /*:self*/ {
-    this.position = 0
-    const token = this.content.length > 0 ? this.content.get(0) : null
-    const marker = token && Marker.match(token)
-    this.attributes = marker
-      ? Dictionary.immutable(marker.attributes)
-      : Dictionary.immutable()
-
-    this.skip(position)
-
-    return this
-  }
-
-  inspect() {
-    const result = []
-    for (const token of this.content) {
-      if (typeof token === "object") {
-        result.push(JSON.stringify(token.attributes))
+        attributes = marker.attributes
+        this.tokens.deleteAt(offset, 1)
       } else {
-        result.push(token)
+        n--
+        offset++
       }
     }
-    return `<RichText>${result.join("")}</RichText>`
+
+    // We have reached the end so no need to insert anything here
+    if (this.size <= offset) {
+      return this
+    }
+
+    const marker = Marker.match(this.tokens.get(offset))
+    if (marker) {
+      // If next token is a marker that matches this format
+      // remove it as it's redundunt
+      if (Dictionary.equals(marker.attributes, format)) {
+        this.tokens.deleteAt(offset, 1)
+      }
+    }
+    // If attributes do not match the format then insert attributes to reset
+    // the format
+    else if (!Dictionary.equals(attributes, format)) {
+      return this.tokens.insertAt(offset, Marker.from({ ...attributes }))
+    }
+  }
+
+  *entries() /*:Iterator<Token>*/ {
+    let node = null
+    for (const token of this.tokens) {
+      if (typeof token === "string") {
+        node = node == null ? token : node + token
+      } else {
+        if (node != null) {
+          yield node
+          node = null
+        }
+        yield token
+      }
+    }
+    if (node != null) {
+      yield node
+    }
+  }
+  toJSON() {
+    const nodes = []
+    let node = null
+
+    for (const token of this.tokens) {
+      if (typeof token == "string") {
+        if (node != null) {
+          node.text += token
+        } else {
+          node = { text: token, attributes: {} }
+        }
+      } else {
+        const marker = Marker.match(token)
+        if (marker) {
+          if (node != null) {
+            nodes.push(node)
+          }
+          node = { attributes: marker.attributes, text: "" }
+        }
+
+        const embed = Embed.match(token)
+        if (embed != null) {
+          const { resource, attributes } = embed
+          if (node != null) {
+            nodes.push(node)
+            node = null
+          }
+          nodes.push({ resource, attributes })
+        }
+      }
+    }
+
+    if (node != null) {
+      nodes.push(node)
+    }
+
+    return nodes
   }
 }

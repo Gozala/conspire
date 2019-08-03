@@ -143,9 +143,9 @@ class Conspirator {
     }
   }
   inspect() {
-    this.root.querySelector(".crdt.state").textContent = new QuillRichText(
-      new Tokens(this.document.content)
-    ).inspect()
+    this.root.querySelector(".crdt.state").textContent = JSON.stringify(
+      new QuillRichText(new Tokens(this.document.content)).toJSON()
+    )
 
     this.root.querySelector(".editor.state").textContent = JSON.stringify(
       this.editor.getContents(),
